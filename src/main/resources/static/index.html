@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stat Roller</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 640px; margin: 2rem auto; padding: 0 1rem; }
+  header { display: flex; justify-content: space-between; align-items: baseline; }
+  button { font-size: 1rem; padding: .5rem 1.2rem; cursor: pointer; }
+  #scores { font-size: 2rem; font-weight: bold; letter-spacing: .4em; margin: 1rem 0 .3rem; }
+  #dice s { color: #999; }
+  #error { color: #b00020; }
+  ol { font-family: ui-monospace, monospace; padding-left: 0; list-style: none; }
+  li { padding: .2rem 0; border-bottom: 1px solid #eee; white-space: pre; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Stat Roller</h1>
+  <a href="swagger-ui.html">API page &rarr;</a>
+</header>
+
+<button id="roll">Roll stats</button>
+<p id="error"></p>
+<div id="scores"></div>
+<div id="dice"></div>
+<p id="pointBuy"></p>
+
+<h2>History</h2>
+<ol id="history"></ol>
+
+<script>
+const BUDGET = 27;
+
+// Same wording as the Swing client.
+const deltaLabel = d => d > 0 ? `${d} ahead` : d < 0 ? `${-d} behind` : 'even';
+
+// Dice with the first lowest one struck through (that's the dropped die).
+function diceHtml(dice) {
+  const dropped = dice.indexOf(Math.min(...dice));
+  return dice.map((v, i) => i === dropped ? `<s>${v}</s>` : v).join(' ');
+}
+
+function historyRow(r) {
+  const t = new Date(r.rolledAt);
+  const pad = n => String(n).padStart(2, '0');
+  const when = `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())} ${pad(t.getHours())}:${pad(t.getMinutes())}`;
+  const scores = r.scores.map(s => String(s).padStart(2)).join(' ');
+  const delta = r.pointBuyDelta >= 0 ? `+${r.pointBuyDelta}` : r.pointBuyDelta;
+  return `#${String(r.id).padEnd(3)} ${when}   ${scores}   ${delta}`;
+}
+
+function show(r) {
+  document.getElementById('scores').textContent = r.scores.join(' ');
+  document.getElementById('dice').innerHTML = r.dice.map(d => `(${diceHtml(d)})`).join('&nbsp;&nbsp;');
+  document.getElementById('pointBuy').textContent =
+    `Point buy: ${r.pointBuyCost} / ${BUDGET}  →  ${deltaLabel(r.pointBuyDelta)}`;
+}
+
+async function api(method) {
+  const res = await fetch('rolls', { method });
+  if (!res.ok) throw new Error(`Service answered HTTP ${res.status}`);
+  return res.json();
+}
+
+async function loadHistory() {
+  const rolls = await api('GET');
+  const list = document.getElementById('history');
+  list.replaceChildren(...rolls.map(r => Object.assign(document.createElement('li'), { textContent: historyRow(r) })));
+}
+
+async function run(action) {
+  const button = document.getElementById('roll');
+  const error = document.getElementById('error');
+  button.disabled = true;
+  error.textContent = '';
+  try {
+    await action();
+  } catch (e) {
+    error.textContent = `Can't reach the stat roller service (${e.message}). Is gradlew bootRun still running?`;
+  } finally {
+    button.disabled = false;
+  }
+}
+
+document.getElementById('roll').onclick = () => run(async () => { show(await api('POST')); await loadHistory(); });
+run(loadHistory);
+</script>
+</body>
+</html>

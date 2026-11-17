@@ -1,0 +1,16 @@
+# Gradle
+.gradle/
+build/
+
+# Runtime data
+rolls.json
+rolls.json.tmp
+
+# IDEs
+.idea/
+*.iml
+.vscode/
+bin/
+.classpath
+.project
+.settings/
